@@ -10,17 +10,22 @@ import com.rocs.chatbi.common.DeleteRequest;
 import com.rocs.chatbi.common.ErrorCode;
 import com.rocs.chatbi.common.ResultUtils;
 import com.rocs.chatbi.constant.CommonConstant;
+import com.rocs.chatbi.constant.FileConstant;
 import com.rocs.chatbi.constant.UserConstant;
 import com.rocs.chatbi.exception.BusinessException;
 import com.rocs.chatbi.exception.ThrowUtils;
 import com.rocs.chatbi.model.dto.chart.*;
+import com.rocs.chatbi.model.dto.file.UploadFileRequest;
 import com.rocs.chatbi.model.entity.Chart;
 import com.rocs.chatbi.model.entity.User;
+import com.rocs.chatbi.model.enums.FileUploadBizEnum;
 import com.rocs.chatbi.service.ChartService;
 import com.rocs.chatbi.service.UserService;
+import com.rocs.chatbi.utils.ExcelUtils;
 import com.rocs.chatbi.utils.SqlUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.ObjectUtils;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.web.bind.annotation.*;
@@ -28,6 +33,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.io.File;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -209,6 +215,53 @@ public class ChartController {
         boolean result = chartService.updateById(chart);
         return ResultUtils.success(result);
     }
+
+    /**
+     * 智能分析
+     *
+     * @param multipartFile
+     * @param genChartByAiRequest
+     * @param request
+     * @return
+     */
+    @PostMapping("/gen")
+    public BaseResponse<String> genChartByAi(@RequestPart("file") MultipartFile multipartFile,
+                                           GenChartByAiRequest genChartByAiRequest, HttpServletRequest request) {
+        String name = genChartByAiRequest.getName();
+        String goal = genChartByAiRequest.getGoal();
+        String chartType = genChartByAiRequest.getChartType();
+        //校验
+        ThrowUtils.throwIf(StringUtils.isBlank(goal), ErrorCode.PARAMS_ERROR, "分析目标不能为空");
+        ThrowUtils.throwIf(StringUtils.isNotBlank(name) && name.length() > 50, ErrorCode.PARAMS_ERROR, "名称长度不能超过20");
+        ThrowUtils.throwIf(StringUtils.isBlank(chartType), ErrorCode.PARAMS_ERROR, "图表类型不能为空");
+        ThrowUtils.throwIf(multipartFile == null, ErrorCode.PARAMS_ERROR, "文件不能为空");
+
+        //读取用户上传文件
+        String result = ExcelUtils.excelToCsv(multipartFile);
+        return ResultUtils.success(result);
+
+//        User loginUser = userService.getLoginUser(request);
+//        // 文件目录：根据业务、用户来划分
+//        String uuid = RandomStringUtils.randomAlphanumeric(8);
+//        String filename = uuid + "-" + multipartFile.getOriginalFilename();
+//        File file = null;
+//        try {
+//            // 返回可访问地址
+//            return ResultUtils.success("");
+//        } catch (Exception e) {
+////            log.error("file upload error, filepath = " + filepath, e);
+//            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "上传失败");
+//        } finally {
+//            if (file != null) {
+//                // 删除临时文件
+//                boolean delete = file.delete();
+//                if (!delete) {
+////                    log.error("file delete error, filepath = {}", filepath);
+//                }
+//            }
+//        }
+    }
+
 
     /**
      * 获取查询包装类
