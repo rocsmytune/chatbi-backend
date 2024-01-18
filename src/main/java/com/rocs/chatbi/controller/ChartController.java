@@ -236,9 +236,16 @@ public class ChartController {
         ThrowUtils.throwIf(StringUtils.isBlank(chartType), ErrorCode.PARAMS_ERROR, "图表类型不能为空");
         ThrowUtils.throwIf(multipartFile == null, ErrorCode.PARAMS_ERROR, "文件不能为空");
 
-        //读取用户上传文件
+
+
+        // 用户输入
+        StringBuffer userInput = new StringBuffer();
+        userInput.append("你是一个高级数据分析师，你将根据我提供给你的分析目标和原始数据，提供分析结论。").append("\n");
+        userInput.append("分析目标：").append(goal).append("\n");
+        //压缩后数据
         String result = ExcelUtils.excelToCsv(multipartFile);
-        return ResultUtils.success(result);
+        userInput.append("数据：").append(result).append("\n");
+        return ResultUtils.success(userInput.toString());
 
 //        User loginUser = userService.getLoginUser(request);
 //        // 文件目录：根据业务、用户来划分
