@@ -22,7 +22,7 @@ class AiManagerTest {
                 "1,24\n" +
                 "2,45\n" +
                 "3,120\n" +
-                "4,140");
+                "4,140", 1766891838285238274L);
         System.out.println(res);
     }
 }

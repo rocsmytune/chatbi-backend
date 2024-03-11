@@ -20,11 +20,12 @@ public class AiManager {
      * 调用AI接口进行对话
      *
      * @param question
+     * @param modelId
      * @return
      */
-    public String doChat(String question) {
+    public String doChat(String question, Long modelId) {
         DevChatRequest devChatRequest = new DevChatRequest();
-        devChatRequest.setModelId(1766891838285238274L);
+        devChatRequest.setModelId(modelId);
         devChatRequest.setMessage(question);
 
         BaseResponse<DevChatResponse> response = yuCongMingClient.doChat(devChatRequest);

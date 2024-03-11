@@ -14,11 +14,13 @@ import com.rocs.chatbi.constant.FileConstant;
 import com.rocs.chatbi.constant.UserConstant;
 import com.rocs.chatbi.exception.BusinessException;
 import com.rocs.chatbi.exception.ThrowUtils;
+import com.rocs.chatbi.manager.AiManager;
 import com.rocs.chatbi.model.dto.chart.*;
 import com.rocs.chatbi.model.dto.file.UploadFileRequest;
 import com.rocs.chatbi.model.entity.Chart;
 import com.rocs.chatbi.model.entity.User;
 import com.rocs.chatbi.model.enums.FileUploadBizEnum;
+import com.rocs.chatbi.model.vo.BiResponse;
 import com.rocs.chatbi.service.ChartService;
 import com.rocs.chatbi.service.UserService;
 import com.rocs.chatbi.utils.ExcelUtils;
@@ -54,6 +56,8 @@ public class ChartController {
     @Resource
     private UserService userService;
 
+    @Resource
+    private AiManager aiManager;
 
     // region 增删改查
 
@@ -225,7 +229,7 @@ public class ChartController {
      * @return
      */
     @PostMapping("/gen")
-    public BaseResponse<String> genChartByAi(@RequestPart("file") MultipartFile multipartFile,
+    public BaseResponse<BiResponse> genChartByAi(@RequestPart("file") MultipartFile multipartFile,
                                            GenChartByAiRequest genChartByAiRequest, HttpServletRequest request) {
         String name = genChartByAiRequest.getName();
         String goal = genChartByAiRequest.getGoal();
@@ -233,51 +237,69 @@ public class ChartController {
         //校验
         ThrowUtils.throwIf(StringUtils.isBlank(goal), ErrorCode.PARAMS_ERROR, "分析目标不能为空");
         ThrowUtils.throwIf(StringUtils.isNotBlank(name) && name.length() > 50, ErrorCode.PARAMS_ERROR, "名称长度不能超过20");
-        ThrowUtils.throwIf(StringUtils.isBlank(chartType), ErrorCode.PARAMS_ERROR, "图表类型不能为空");
-        ThrowUtils.throwIf(multipartFile == null, ErrorCode.PARAMS_ERROR, "文件不能为空");
+//        ThrowUtils.throwIf(StringUtils.isBlank(chartType), ErrorCode.PARAMS_ERROR, "图表类型不能为空");
+//        ThrowUtils.throwIf(multipartFile == null, ErrorCode.PARAMS_ERROR, "文件不能为空");
+        // 用户获取
+        User loginUser = userService.getLoginUser(request);
 
-        final String prompt = "你是一个高级数据分析师和前端开发专家，接下来我将按照以下固定格式提供给你提供内容：\n" +
-                "分析需求：\n" +
-                "{数据分析的需求或者目标}\n" +
-                "原始数据：\n" +
-                "{csv格式的原始数据，用,作为分隔符}\n" +
-                "请根据这两部分内容，按照以下指定格式生成内容（此外不要输出任何多余的开头、结尾、注释）\n" +
-                "$$$$$\n" +
-                "{前端 Echarts V5 的 option 配置对象js代码，合理地将数据进行可视化，不要生成任何多余的内容，比如注释}\n" +
-                "$$$$$" +
-                "{明确的数据分析结论，越详细越好，不要生成多余的注释}";
+        // 直接调用AI接口
+//        final String prompt = "你是一个高级数据分析师和前端开发专家，接下来我将按照以下固定格式提供给你提供内容：\n" +
+//                "分析需求：\n" +
+//                "{数据分析的需求或者目标}\n" +
+//                "原始数据：\n" +
+//                "{csv格式的原始数据，用,作为分隔符}\n" +
+//                "请根据这两部分内容，按照以下指定格式生成内容（此外不要输出任何多余的开头、结尾、注释）\n" +
+//                "【】【】【】【】\n" +
+//                "{前端 Echarts V5 的 option 配置对象js代码，合理地将数据进行可视化，不要生成任何多余的内容，比如注释}\n" +
+//                "【】【】【】【】" +
+//                "{明确的数据分析结论，越详细越好，不要生成多余的注释}";
 
-
+        long biModelId = 1766891838285238274L;
 
         // 用户输入
         StringBuffer userInput = new StringBuffer();
-        userInput.append("你是一个高级数据分析师，你将根据我提供给你的分析目标和原始数据，提供分析结论。").append("\n");
-        userInput.append("分析目标：").append(goal).append("\n");
-        //压缩后数据
-        String result = ExcelUtils.excelToCsv(multipartFile);
-        userInput.append("数据：").append(result).append("\n");
-        return ResultUtils.success(userInput.toString());
+        userInput.append("分析需求：").append("\n");
 
-//        User loginUser = userService.getLoginUser(request);
-//        // 文件目录：根据业务、用户来划分
-//        String uuid = RandomStringUtils.randomAlphanumeric(8);
-//        String filename = uuid + "-" + multipartFile.getOriginalFilename();
-//        File file = null;
-//        try {
-//            // 返回可访问地址
-//            return ResultUtils.success("");
-//        } catch (Exception e) {
-////            log.error("file upload error, filepath = " + filepath, e);
-//            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "上传失败");
-//        } finally {
-//            if (file != null) {
-//                // 删除临时文件
-//                boolean delete = file.delete();
-//                if (!delete) {
-////                    log.error("file delete error, filepath = {}", filepath);
-//                }
-//            }
-//        }
+        // 拼接分析目标
+        String userGoal = goal;
+        if (StringUtils.isNotBlank(chartType)) {
+            userGoal = goal + "，请使用" + chartType;
+        }
+
+        userInput.append(userGoal).append("\n");
+        userInput.append("原始数据：").append("\n");
+        //压缩后数据
+        String csvResult = ExcelUtils.excelToCsv(multipartFile);
+        userInput.append(csvResult).append("\n");
+
+        String res = aiManager.doChat(userInput.toString(), biModelId);
+        String[] splits = res.split("【】【】【】【】");
+
+        if (splits.length < 3) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "AI 生成错误");
+        }
+        String genChart = splits[1].trim();
+        String genResult = splits[2].trim();
+
+        // 保存文件
+        Chart chart = new Chart();
+        chart.setName(name);
+        chart.setGoal(goal);
+        chart.setChartData(csvResult);
+        chart.setCharType(chartType);
+        chart.setGenChart(genChart);
+        chart.setGenResult(genResult);
+        chart.setUserId(loginUser.getId());
+
+        boolean saveResult = chartService.save(chart);
+        ThrowUtils.throwIf(!saveResult, ErrorCode.SYSTEM_ERROR, "图表保存失败");
+
+        BiResponse biResponse = new BiResponse();
+        biResponse.setGenChart(genChart);
+        biResponse.setGenResult(genResult);
+        biResponse.setChatId(chart.getId());
+
+        return ResultUtils.success(biResponse);
     }
 
 
